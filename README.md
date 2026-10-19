@@ -1,0 +1,31 @@
+# KLM QR Studio
+
+Pembuat QR code dengan kustomisasi lengkap. Semua proses di perangkat — tanpa server, bisa offline, bisa dipasang (PWA) dan tersedia versi Windows (.exe).
+
+**Buka aplikasi:** https://klmthebest10.github.io/klm-qr-studio/
+**Unduh versi Windows:** lihat halaman [Releases](https://github.com/klmthebest10/klm-qr-studio/releases/latest)
+
+## Fitur
+- **12 jenis isi:** Tautan, Teks, WiFi, Kontak (vCard), Email, SMS, Telepon, WhatsApp, Lokasi, Acara kalender, Sosmed, Info transfer
+- **Gaya:** 13 bentuk titik, 8 bingkai mata, 8 bola mata, ukuran titik, 10 template
+- **Warna:** polos / gradasi / radial untuk titik & latar, warna mata terpisah, latar transparan, sudut membulat
+- **Logo:** unggah, seret, tempel, atau ikon cepat; ukuran, jarak, sudut, latar logo
+- **Bingkai berteks:** bawah, atas, gelembung, kapsul, garis
+- **Lapisan teks:** tambah teks sebanyak apa pun di atas / bawah / kiri / kanan QR atau bebas di mana saja (bisa diseret di pratinjau, diputar). Atur huruf, ketebalan, miring, ukuran, warna, jarak huruf & baris, banyak baris, dan label berlatar
+- **Lanjutan:** ECC L/M/Q/H, versi minimum, pola mask, zona tenang
+- **Ekspor:** PNG / SVG / JPG / WEBP sampai 4096 px, salin, bagikan, cetak
+- **Massal:** banyak QR sekaligus jadi satu ZIP, dengan `{nama}`, `{no}`, `{isi}` di teks
+- Riwayat, simpan gaya, impor/ekspor pengaturan, peringatan kontras, tema terang/gelap, Ctrl+S untuk unduh
+
+## Versi Windows
+`KLM QR Studio.exe` adalah satu file tanpa instalasi tambahan. Saat pertama dibuka, aplikasi menawarkan pemasangan (shortcut Desktop & Start Menu, bisa dihapus lewat Settings › Apps). Aplikasi tampil sebagai jendela sendiri lewat Microsoft Edge/Chrome yang sudah ada di Windows.
+
+Karena exe belum ditandatangani, Windows SmartScreen bisa memberi peringatan: klik **More info → Run anyway**.
+
+Bangun sendiri: masuk ke folder `windows/`, jalankan `build.bat` (Windows) atau `./build.sh` (Linux/macOS). Butuh Go 1.21+.
+
+## Struktur
+- `index.html`, `style.css`, `app.js` — aplikasi
+- `qrcodegen.js` — encoder QR dari [nayuki/QR-Code-generator](https://github.com/nayuki/QR-Code-generator) (MIT)
+- `sw.js`, `manifest.webmanifest`, `icons/` — PWA
+- `windows/` — peluncur Windows (Go)
