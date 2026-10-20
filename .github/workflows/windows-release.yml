@@ -1,0 +1,36 @@
+name: Bangun versi Windows
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Bangun exe
+        working-directory: windows
+        run: sh build.sh
+      - name: Kemas zip
+        run: cd windows && zip -q ../KLM-QR-Studio-Windows.zip "KLM QR Studio.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KLM-QR-Studio-Windows
+          path: KLM-QR-Studio-Windows.zip
+      - name: Terbitkan Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: KLM-QR-Studio-Windows.zip
+          body: |
+            Unduh **KLM-QR-Studio-Windows.zip**, ekstrak, lalu jalankan `KLM QR Studio.exe`.
+            Saat pertama dibuka akan ditawari pemasangan (shortcut Desktop & Start Menu).
+            Bila muncul peringatan SmartScreen: klik **More info → Run anyway**.

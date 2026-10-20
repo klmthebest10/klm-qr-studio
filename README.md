@@ -3,7 +3,7 @@
 Pembuat QR code dengan kustomisasi lengkap. Semua proses di perangkat — tanpa server, bisa offline, bisa dipasang (PWA) dan tersedia versi Windows (.exe).
 
 **Buka aplikasi:** https://klmthebest10.github.io/klm-qr-studio/
-**Unduh versi Windows:** lihat halaman [Releases](https://github.com/klmthebest10/klm-qr-studio/releases/latest)
+**Unduh versi Windows:** [KLM-QR-Studio-Windows.zip](https://github.com/klmthebest10/klm-qr-studio/raw/main/unduh/KLM-QR-Studio-Windows.zip) (atau halaman [Releases](https://github.com/klmthebest10/klm-qr-studio/releases/latest))
 
 ## Fitur
 - **12 jenis isi:** Tautan, Teks, WiFi, Kontak (vCard), Email, SMS, Telepon, WhatsApp, Lokasi, Acara kalender, Sosmed, Info transfer
@@ -21,6 +21,8 @@ Pembuat QR code dengan kustomisasi lengkap. Semua proses di perangkat — tanpa 
 `KLM QR Studio.exe` adalah satu file tanpa instalasi tambahan. Saat pertama dibuka, aplikasi menawarkan pemasangan (shortcut Desktop & Start Menu, bisa dihapus lewat Settings › Apps). Aplikasi tampil sebagai jendela sendiri lewat Microsoft Edge/Chrome yang sudah ada di Windows.
 
 Karena exe belum ditandatangani, Windows SmartScreen bisa memberi peringatan: klik **More info → Run anyway**.
+
+Setiap kali tag `v*` (misalnya `v1.2.0`) di-push, GitHub Actions otomatis membangun exe dan menerbitkannya di Releases.
 
 Bangun sendiri: masuk ke folder `windows/`, jalankan `build.bat` (Windows) atau `./build.sh` (Linux/macOS). Butuh Go 1.21+.
 
