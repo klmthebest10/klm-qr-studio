@@ -11,6 +11,7 @@ Pembuat QR code dengan kustomisasi lengkap. Semua proses di perangkat — tanpa 
 - **Warna:** polos / gradasi / radial untuk titik & latar, warna mata terpisah, latar transparan, sudut membulat
 - **Logo:** unggah, seret, tempel, atau ikon cepat; ukuran, jarak, sudut, latar logo
 - **Bingkai berteks:** bawah, atas, gelembung, kapsul, garis
+- **QR foto:** pasang foto sebagai latar QR (gaya halftone) atau isi titik-titik QR dengan foto; potong, perbesar, geser, kecerahan, kontras, hitam putih, dan kerapatan QR. Otomatis ECC H dan penjaga keterbacaan
 - **Lapisan teks:** tambah teks sebanyak apa pun di atas / bawah / kiri / kanan QR atau bebas di mana saja (bisa diseret di pratinjau, diputar). Atur huruf, ketebalan, miring, ukuran, warna, jarak huruf & baris, banyak baris, dan label berlatar
 - **Lanjutan:** ECC L/M/Q/H, versi minimum, pola mask, zona tenang
 - **Ekspor:** PNG / SVG / JPG / WEBP sampai 4096 px, salin, bagikan, cetak

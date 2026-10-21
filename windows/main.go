@@ -30,7 +30,7 @@ const (
 	appID    = "KLMQRStudio"
 	fixPort  = "47821"
 	exeName  = "KLM QR Studio.exe"
-	version  = "1.1.0"
+	version  = "1.2.0"
 	pingBody = "klm-qr-studio"
 )
 

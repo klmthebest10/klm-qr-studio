@@ -1,4 +1,4 @@
-const CACHE = 'klm-qr-studio-v2';
+const CACHE = 'klm-qr-studio-v3';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './qrcodegen.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-180.png', './icons/favicon-32.png'];
 

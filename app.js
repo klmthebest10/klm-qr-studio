@@ -24,6 +24,8 @@ const DEFAULT = {
   logo: { src: null, size: 22, margin: 1, round: 20, hide: true, bg: true, bgColor: '#ffffff' },
   frame: { style: 'none', text: 'PINDAI SAYA', color: '#1b1640', textColor: '#ffffff', font: 'sans', weight: '800', size: 3, spacing: 0.15 },
   texts: [], textBg: { mode: 'auto', color: '#ffffff' },
+  photo: { src: null, proc: null, avg: 0, mode: 'halftone', shape: 'square', dot: 0.42, opacity: 1, light: '#ffffff',
+    zoom: 1, px: 50, py: 50, bright: 0, contrast: 0, gray: false, minVer: 6, safe: true },
   exportSize: 1024, fmt: 'png', quality: 0.92, fileName: 'qr-code'
 };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -112,10 +114,13 @@ function encode(text, st = S) {
   const lv = { L: ECC().LOW, M: ECC().MEDIUM, Q: ECC().QUARTILE, H: ECC().HIGH };
   let ecl = lv[st.ecl] || lv.Q;
   if (st.logo.src && (st.ecl === 'L' || st.ecl === 'M')) ecl = lv.Q;
+  const hasPh = !!(st.photo && st.photo.proc);
+  if (hasPh) ecl = lv.H;
   const segs = qrcodegen.QrSegment.makeSegments(text || ' ');
   // logo menutup sebagian modul: versi kecil terlalu rapuh, jadi naikkan versi minimum
   let minV = +st.minVer || 1;
   if (st.logo.src) minV = Math.max(minV, st.logo.size > 30 && st.logo.margin > .5 ? 7 : 5);
+  if (hasPh) minV = Math.max(minV, +st.photo.minVer || 1);
   return qrcodegen.QrCode.encodeSegments(segs, ecl, minV, 40, +st.mask, st.boost || !!st.logo.src);
 }
 
@@ -234,6 +239,32 @@ function renderSVG(st = S, text = dataOf(st), opt = {}) {
     if (!on(x, y)) continue;
     dp += dotPath(st.dotStyle, x + m, y + m, { t: on(x, y - 1), r: on(x + 1, y), b: on(x, y + 1), l: on(x - 1, y) }, +st.dotScale);
   }
+  // foto
+  const ph = Object.assign({}, DEFAULT.photo, st.photo), hasPhoto = !!ph.proc && !opt.noPhoto, half = hasPhoto && ph.mode === 'halftone';
+  let lp = '', photoUnder = '', photoDef = '';
+  if (half) {
+    // modul fungsi (timing, alignment, format, versi) digambar penuh supaya mudah dikenali pemindai
+    const full = new Set(), mark = (x, y) => { if (x >= 0 && y >= 0 && x < n && y < n) full.add(y * n + x); };
+    for (let i = 0; i < n; i++) { mark(6, i); mark(i, 6); }
+    for (let i = 0; i < 9; i++) { mark(8, i); mark(i, 8); }
+    for (let i = 0; i < 8; i++) { mark(n - 1 - i, 8); mark(8, n - 1 - i); }
+    const ap = qr.getAlignmentPatternPositions(), last = ap.length - 1;
+    ap.forEach((a, i) => ap.forEach((b, j) => { if ((i === 0 && j === 0) || (i === 0 && j === last) || (i === last && j === 0)) return;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) mark(a + dx, b + dy); }));
+    if (qr.version >= 7) for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { mark(n - 11 + j, i); mark(i, n - 11 + j); }
+    const ds = Math.max(.15, Math.min(1, +ph.dot)), o = (1 - ds) / 2;
+    const cell = (x, y, f) => f ? rr(x, y, 1.02, 1.02, [0,0,0,0]) : ph.shape === 'circle' ? circ(x + .5, y + .5, ds / 2) : rr(x + o, y + o, ds, ds, Array(4).fill(ds * .18));
+    dp = '';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      if (isFinder(x, y) || hidden(x, y)) continue;
+      const f = full.has(y * n + x);
+      if (qr.getModule(x, y)) dp += cell(x + m, y + m, f); else lp += cell(x + m, y + m, f);
+    }
+    [[0, 0], [n - 8, 0], [0, n - 8]].forEach(([fx, fy]) => { lp += rr(fx + m, fy + m, 8, 8, [0,0,0,0]); });
+    photoUnder = `<image href="${ph.proc}" x="${f3(m)}" y="${f3(m)}" width="${n}" height="${n}" preserveAspectRatio="none" opacity="${f3(ph.opacity)}"/>`;
+  } else if (hasPhoto) {
+    photoDef = `<pattern id="${id}p" patternUnits="userSpaceOnUse" x="${f3(m)}" y="${f3(m)}" width="${n}" height="${n}"><image href="${ph.proc}" width="${n}" height="${n}" preserveAspectRatio="none"/></pattern>`;
+  }
   let fp = '', bp = '';
   [[0, 0], [n - 7, 0], [0, n - 7]].forEach(([ex, ey], i) => { fp += eyeFramePath(st.eyeFrame, ex + m, ey + m, i); bp += eyeBallPath(st.eyeBall, ex + m + 2, ey + m + 2, i); });
 
@@ -263,7 +294,8 @@ function renderSVG(st = S, text = dataOf(st), opt = {}) {
     }
   }
   const box = [ox + m, oy + m, n];
-  const dF = paintDef(id + 'd', st.dotFill, box);
+  let dF = paintDef(id + 'd', st.dotFill, box);
+  if (photoDef) dF = { def: dF.def + photoDef, ref: `url(#${id}p)` };
   const efF = st.eyeSame ? dF : { def: '', ref: st.eyeFrameColor };
   const ebF = st.eyeSame ? dF : { def: '', ref: st.eyeBallColor };
   const bgF = paintDef(id + 'b', st.bgFill, [ox, oy, Q]);
@@ -278,7 +310,7 @@ function renderSVG(st = S, text = dataOf(st), opt = {}) {
     logoDef = `<clipPath id="${id}c"><rect x="${f3(x)}" y="${f3(y)}" width="${f3(L)}" height="${f3(L)}" rx="${f3(rad)}"/></clipPath>`;
     logoEl += `<image href="${lg.src}" x="${f3(x)}" y="${f3(y)}" width="${f3(L)}" height="${f3(L)}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${id}c)"/>`;
   }
-  const inner = `${back}${qrBg}<g transform="translate(${f3(ox)} ${f3(oy)})"><path d="${dp}" fill="${dF.ref}"/><path d="${fp}" fill="${efF.ref}" fill-rule="evenodd"/><path d="${bp}" fill="${ebF.ref}"/></g>${logoEl}${fore}`;
+  const inner = `${back}${qrBg}<g transform="translate(${f3(ox)} ${f3(oy)})">${photoUnder}${lp ? `<path d="${lp}" fill="${ph.light}"/>` : ''}<path d="${dp}" fill="${dF.ref}"/><path d="${fp}" fill="${efF.ref}" fill-rule="evenodd"/><path d="${bp}" fill="${ebF.ref}"/></g>${logoEl}${fore}`;
   const T = layoutTexts(st, W, H, inner, opt);
   const px = opt.px || null;
   const sizeAttr = px ? ` width="${Math.round(px * T.W / Q)}" height="${Math.round(px * T.H / Q)}"` : '';
@@ -368,7 +400,7 @@ const PRESETS = [
   ['Garis', { dotStyle:'vlines', dotScale:.9, eyeFrame:'rounded', eyeBall:'rounded', dotFill:{mode:'solid',c1:'#232323'}, eyeSame:true, bgFill:{mode:'solid',c1:'#f5f5f0'}, radius:2, frame:{style:'none'} }],
   ['Bintang', { dotStyle:'star', dotScale:1, eyeFrame:'soft', eyeBall:'star', dotFill:{mode:'radial',c1:'#f48c06',c2:'#9d0208'}, eyeSame:true, bgFill:{mode:'solid',c1:'#fffaf0'}, radius:3, frame:{style:'none'} }]
 ];
-const applyStyle = s => { const keep = { type: S.type, fields: S.fields, logo: S.logo }; S = merge(merge(DEFAULT, pickStyle(S)), s); Object.assign(S, keep); if (s.logo) S.logo = merge(DEFAULT.logo, s.logo); };
+const applyStyle = s => { const keep = { type: S.type, fields: S.fields, logo: S.logo, photo: S.photo }; S = merge(merge(DEFAULT, pickStyle(S)), s); Object.assign(S, keep); if (s.logo) S.logo = merge(DEFAULT.logo, s.logo); };
 
 /* ---------------- UI BUILD ---------------- */
 function chipGrid(el, list, key, sampler) {
@@ -442,7 +474,14 @@ const BIND = {
   frameSize: ['frame.size', Number, v => v, v => (+v).toFixed(1)], frameSpacing: ['frame.spacing', Number, v => v, v => (+v).toFixed(2)],
   ecl: ['ecl'], boost: ['boost'], margin: ['margin', Number, v => v, v => v + ' modul'], minVer: ['minVer', Number], mask: ['mask', Number],
   quality: ['quality', Number, v => v, v => Math.round(v * 100) + '%'],
-  fmt: ['fmt'], exportSize: ['exportSize', Number], fileName: ['fileName']
+  fmt: ['fmt'], exportSize: ['exportSize', Number], fileName: ['fileName'],
+  photoDot: ['photo.dot', v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
+  photoOpacity: ['photo.opacity', v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
+  photoLight: ['photo.light'], photoGray: ['photo.gray'], photoSafe: ['photo.safe'],
+  photoZoom: ['photo.zoom', Number, v => v, v => (+v).toFixed(1) + '×'],
+  photoPx: ['photo.px', Number, v => v, v => Math.round(v) + '%'], photoPy: ['photo.py', Number, v => v, v => Math.round(v) + '%'],
+  photoBright: ['photo.bright', Number, v => v, v => (v > 0 ? '+' : '') + v], photoContrast: ['photo.contrast', Number, v => v, v => (v > 0 ? '+' : '') + v],
+  photoMinVer: ['photo.minVer', Number, v => v, v => 'versi ' + v]
 };
 const getP = p => p.split('.').reduce((o, k) => o[k], S);
 const setP = (p, v) => { const ks = p.split('.'), last = ks.pop(); ks.reduce((o, k) => o[k], S)[last] = v; };
@@ -464,6 +503,7 @@ for (const id in BIND) {
     setP(p, el.type === 'checkbox' ? el.checked : conv(el.value));
     const hex = document.querySelector(`.hex[data-for="${id}"]`); if (hex) hex.value = el.value;
     if (id === 'eyeSame' || id === 'bgTransparent') syncInputs();
+    if (/^photo(Zoom|Px|Py|Bright|Contrast|Gray|Safe)$/.test(id)) { const out = document.getElementById(id + 'Out'); if (out && BIND[id][3]) out.textContent = BIND[id][3](getP(BIND[id][0])); return schedPhoto(); }
     const out = document.getElementById(id + 'Out'); if (out && BIND[id][3]) out.textContent = BIND[id][3](getP(p));
     update(id === 'fileName' || id === 'fmt' || id === 'exportSize' || id === 'quality');
   });
@@ -529,8 +569,74 @@ $('#logoFile').onchange = e => readLogo(e.target.files[0]);
 ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => readLogo(e.dataTransfer.files[0]));
-document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (f && $('[data-panel="logo"]').classList.contains('on')) readLogo(f); });
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (!f) return; if ($('[data-panel="logo"]').classList.contains('on')) readLogo(f); else if ($('[data-panel="foto"]').classList.contains('on')) readPhoto(f); });
 $('#logoClear').onclick = () => setLogo(null);
+
+// foto
+let photoImg = null, photoImgSrc = null, photoRAF = 0;
+function processPhoto() {
+  const P = S.photo;
+  if (!photoImg || !P.src) { P.proc = null; return; }
+  const N = 480, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
+  const iw = photoImg.naturalWidth, ih = photoImg.naturalHeight, side = Math.min(iw, ih) / Math.max(1, +P.zoom);
+  x.drawImage(photoImg, (iw - side) * P.px / 100, (ih - side) * P.py / 100, side, side, 0, 0, N, N);
+  const capL = P.mode === 'fill' && P.safe !== false ? .4 : 0;
+  const d = x.getImageData(0, 0, N, N), a = d.data, br = P.bright / 100 * 160, ct = (+P.contrast + 100) / 100; let sum = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    let r = a[i], g = a[i + 1], b = a[i + 2];
+    if (P.gray) r = g = b = .299 * r + .587 * g + .114 * b;
+    r = (r - 128) * ct + 128 + br; g = (g - 128) * ct + 128 + br; b = (b - 128) * ct + 128 + br;
+    a[i] = r < 0 ? 0 : r > 255 ? 255 : r; a[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g; a[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+    let l = (.299 * a[i] + .587 * a[i + 1] + .114 * a[i + 2]) / 255;
+    if (capL && l > capL) { const k = capL / l; a[i] *= k; a[i + 1] *= k; a[i + 2] *= k; l = capL; }
+    sum += l * 255;
+  }
+  x.putImageData(d, 0, 0); P.proc = c.toDataURL('image/jpeg', .86); P.avg = sum / (N * N) / 255;
+}
+function schedPhoto() { if (photoRAF) return; photoRAF = requestAnimationFrame(() => { photoRAF = 0; processPhoto(); update(); }); }
+function loadPhoto(then) {
+  const src = S.photo.src;
+  if (!src) { photoImg = photoImgSrc = null; S.photo.proc = null; return then && then(); }
+  if (photoImg && photoImgSrc === src) return then && then();
+  const im = new Image(); im.onload = () => { photoImg = im; photoImgSrc = src; then && then(); }; im.src = src;
+}
+function syncPhoto() {
+  const P = S.photo, prev = $('#photoPrev');
+  if (P.src) { prev.src = P.proc || P.src; prev.classList.remove('hidden'); } else prev.classList.add('hidden');
+  $$('#photoMode button').forEach(b => b.classList.toggle('on', b.dataset.v === P.mode));
+  $$('#photoShape button').forEach(b => b.classList.toggle('on', b.dataset.v === P.shape));
+  $('#htOpts').classList.toggle('hidden', P.mode !== 'halftone'); $('#fillOpts').classList.toggle('hidden', P.mode !== 'fill');
+  $('#photoModeHint').textContent = P.mode === 'halftone'
+    ? 'Foto tampil penuh di belakang QR. Titik kecil di tengah tiap modul menjaga QR tetap bisa dipindai.'
+    : 'Titik-titik QR diisi dengan foto, latar tetap polos. Pakai foto yang cukup gelap atau turunkan kecerahan.';
+  if (P.src && !photoImg) loadPhoto(() => { processPhoto(); syncPhoto(); update(); });
+}
+function readPhoto(file) {
+  if (!file || !file.type.startsWith('image/')) return toast('Pilih file gambar');
+  const r = new FileReader();
+  r.onload = () => {
+    const img = new Image(); img.onload = () => {
+      const max = 1200, k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+      Object.assign(S.photo, { src: c.toDataURL('image/jpeg', .88), zoom: 1, px: 50, py: 50 });
+      photoImg = null; loadPhoto(() => { processPhoto();
+        syncInputs(); syncPhoto(); update(); toast('Foto dipasang'); });
+    }; img.src = r.result;
+  };
+  r.readAsDataURL(file);
+}
+const pDrop = $('#photoDrop');
+pDrop.onclick = () => $('#photoFile').click();
+$('#photoFile').onchange = e => { readPhoto(e.target.files[0]); e.target.value = ''; };
+['dragenter','dragover'].forEach(ev => pDrop.addEventListener(ev, e => { e.preventDefault(); pDrop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => pDrop.addEventListener(ev, e => { e.preventDefault(); pDrop.classList.remove('over'); }));
+pDrop.addEventListener('drop', e => readPhoto(e.dataTransfer.files[0]));
+$('#photoClear').onclick = () => { S.photo.src = S.photo.proc = null; photoImg = null; syncPhoto(); update(); };
+$('#photoMode').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.photo.mode = b.dataset.v;
+  processPhoto();
+  syncPhoto(); update(); };
+$('#photoShape').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.photo.shape = b.dataset.v; syncPhoto(); update(); };
 
 // tabs
 $('#tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; $$('#tabs button').forEach(x => x.classList.toggle('on', x === b)); $$('.panel').forEach(p => p.classList.toggle('on', p.dataset.panel === b.dataset.tab));
@@ -546,7 +652,7 @@ let lastRender = null, saveT;
 const lum = hex => { const c = hex.slice(1).match(/../g).map(h => { const v = parseInt(h, 16) / 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
 const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
 function update(skipRender) {
-  clearTimeout(saveT); saveT = setTimeout(() => { if (!LS.set('qrs.state', S)) { const t = clone(S); t.logo.src = null; LS.set('qrs.state', t); } }, 300);
+  clearTimeout(saveT); saveT = setTimeout(() => { if (LS.set('qrs.state', S)) return; const t = clone(S); t.photo.src = t.photo.proc = null; if (LS.set('qrs.state', t)) return; t.logo.src = null; LS.set('qrs.state', t); }, 300);
   if (skipRender) return;
   syncChips();
   const data = dataOf();
@@ -564,12 +670,15 @@ function update(skipRender) {
   const cr = Math.min(contrast(dc, bc), contrast(dc2, bc));
   if (cr < 3) w.push('Kontras warna titik dan latar rendah — QR bisa sulit dipindai.');
   if (lum(dc) > lum(bc) + .2) w.push('Titik lebih terang dari latar (warna terbalik). Sebagian pemindai tidak bisa membacanya.');
+  if (S.photo.proc && S.photo.mode === 'fill' && S.photo.avg > .45) w.push('Foto terlalu terang untuk mengisi titik — turunkan kecerahan atau naikkan kontras di tab Foto.');
+  if (S.photo.proc && S.photo.mode === 'halftone' && S.photo.dot < .38) w.push('Titik pusat kecil — QR foto perlu dicetak cukup besar (min. ±3 cm) agar mudah dipindai.');
+  if (S.photo.proc && S.photo.minVer > 8 && +S.exportSize < 800) w.push('QR foto rapat — unduh dengan ukuran besar dan cetak minimal ±4 cm.');
   if (S.logo.src && S.logo.size > 28 && eclName !== 'H') w.push('Logo besar — pertimbangkan ECC H atau kecilkan logo.');
   if (+S.margin < 2 && S.frame.style === 'none') w.push('Zona tenang kecil — sisakan margin minimal 2 bila latar sekitar ramai.');
   if (S.dotScale < .6 && ['dots','mini','diamond','star','heart','cross'].includes(S.dotStyle)) w.push('Titik sangat kecil bisa menurunkan keterbacaan.');
   $('#warn').innerHTML = w.map(x => '⚠ ' + x).join('<br>'); $('#warn').classList.toggle('hidden', !w.length);
 }
-function refreshAll() { buildFills(); syncInputs(); syncLogo(); buildForm(); renderTextList(); if ($('[data-panel="bingkai"]').classList.contains('on')) buildFrameGrid(); update(); }
+function refreshAll() { buildFills(); syncInputs(); syncLogo(); syncPhoto(); buildForm(); renderTextList(); if ($('[data-panel="bingkai"]').classList.contains('on')) buildFrameGrid(); update(); }
 
 /* ---------------- EXPORT ---------------- */
 function rasterize(svg, w, h, fmt, quality, bgFill) {

@@ -70,6 +70,7 @@
       <button data-tab="gaya">Gaya</button>
       <button data-tab="warna">Warna</button>
       <button data-tab="logo">Logo</button>
+      <button data-tab="foto">Foto</button>
       <button data-tab="bingkai">Bingkai</button>
       <button data-tab="teks">Teks</button>
       <button data-tab="lanjut">Lanjutan</button>
@@ -131,6 +132,41 @@
       <label class="switch"><input type="checkbox" id="logoBg"><i></i><span>Latar di belakang logo</span></label>
       <label class="field"><span>Warna latar logo</span><div class="color"><input type="color" id="logoBgColor"><input class="hex" data-for="logoBgColor"></div></label>
       <p class="hint">Saat ada logo, koreksi kesalahan otomatis dinaikkan supaya tetap terbaca.</p>
+    </div>
+
+    <!-- FOTO -->
+    <div class="card panel" data-panel="foto">
+      <div class="drop" id="photoDrop">
+        <input type="file" id="photoFile" accept="image/*" hidden>
+        <img id="photoPrev" alt="" class="hidden">
+        <div class="drop-txt"><b>Pilih foto untuk QR</b><span>Klik, seret ke sini, atau tempel (Ctrl+V)</span></div>
+      </div>
+      <button class="btn sm ghost" id="photoClear">Hapus foto</button>
+      <h3>Cara memakai foto</h3>
+      <div class="seg" id="photoMode"><button type="button" data-v="halftone">Foto sebagai latar</button><button type="button" data-v="fill">Foto di dalam titik</button></div>
+      <p class="hint" id="photoModeHint"></p>
+      <div id="htOpts">
+        <div class="field"><span>Bentuk titik pusat</span><div class="seg" id="photoShape"><button type="button" data-v="square">Kotak</button><button type="button" data-v="circle">Bulat</button></div></div>
+        <div class="field"><span>Ukuran titik pusat <output id="photoDotOut"></output></span><input type="range" id="photoDot" min="30" max="70" step="1"></div>
+        <div class="field"><span>Kejelasan foto <output id="photoOpacityOut"></output></span><input type="range" id="photoOpacity" min="30" max="100" step="1"></div>
+        <label class="field"><span>Warna titik terang</span><div class="color"><input type="color" id="photoLight"><input class="hex" data-for="photoLight"></div></label>
+      </div>
+      <div id="fillOpts">
+        <label class="switch"><input type="checkbox" id="photoSafe"><i></i><span>Jaga keterbacaan (gelapkan bagian foto yang terlalu terang)</span></label>
+      </div>
+      <h3>Potong &amp; atur foto</h3>
+      <div class="field"><span>Perbesar <output id="photoZoomOut"></output></span><input type="range" id="photoZoom" min="1" max="4" step="0.05"></div>
+      <div class="row2">
+        <div class="field"><span>Geser kiri–kanan <output id="photoPxOut"></output></span><input type="range" id="photoPx" min="0" max="100" step="1"></div>
+        <div class="field"><span>Geser atas–bawah <output id="photoPyOut"></output></span><input type="range" id="photoPy" min="0" max="100" step="1"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><span>Kecerahan <output id="photoBrightOut"></output></span><input type="range" id="photoBright" min="-100" max="100" step="1"></div>
+        <div class="field"><span>Kontras <output id="photoContrastOut"></output></span><input type="range" id="photoContrast" min="-60" max="100" step="1"></div>
+      </div>
+      <label class="switch"><input type="checkbox" id="photoGray"><i></i><span>Hitam putih</span></label>
+      <div class="field"><span>Kerapatan QR (lebih rapat = foto lebih detail) <output id="photoMinVerOut"></output></span><input type="range" id="photoMinVer" min="1" max="15" step="1"></div>
+      <p class="hint">Saat ada foto, koreksi kesalahan otomatis dinaikkan ke H. Selalu coba pindai dulu sebelum mencetak banyak.</p>
     </div>
 
     <!-- BINGKAI -->
