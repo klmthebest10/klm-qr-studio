@@ -11,6 +11,7 @@ Pembuat QR code dengan kustomisasi lengkap. Semua proses di perangkat — tanpa 
 - **Warna:** polos / gradasi / radial untuk titik & latar, warna mata terpisah, latar transparan, sudut membulat
 - **Logo:** unggah, seret, tempel, atau ikon cepat; ukuran, jarak, sudut, latar logo
 - **Bingkai berteks:** bawah, atas, gelembung, kapsul, garis
+- **QR berisi foto:** jenis isi *Foto* menyimpan foto kecil langsung di dalam QR (tanpa server). Saat dipindai, HP membuka `lihat.html` yang menampilkan fotonya. Atau pakai tautan foto online untuk foto ukuran penuh
 - **QR foto:** pasang foto sebagai latar QR (gaya halftone) atau isi titik-titik QR dengan foto; potong, perbesar, geser, kecerahan, kontras, hitam putih, dan kerapatan QR. Otomatis ECC H dan penjaga keterbacaan
 - **Lapisan teks:** tambah teks sebanyak apa pun di atas / bawah / kiri / kanan QR atau bebas di mana saja (bisa diseret di pratinjau, diputar). Atur huruf, ketebalan, miring, ukuran, warna, jarak huruf & baris, banyak baris, dan label berlatar
 - **Lanjutan:** ECC L/M/Q/H, versi minimum, pola mask, zona tenang
@@ -30,5 +31,6 @@ Bangun sendiri: masuk ke folder `windows/`, jalankan `build.bat` (Windows) atau 
 ## Struktur
 - `index.html`, `style.css`, `app.js` — aplikasi
 - `qrcodegen.js` — encoder QR dari [nayuki/QR-Code-generator](https://github.com/nayuki/QR-Code-generator) (MIT)
+- `lihat.html` — halaman penampil untuk QR berisi foto
 - `sw.js`, `manifest.webmanifest`, `icons/` — PWA
 - `windows/` — peluncur Windows (Go)

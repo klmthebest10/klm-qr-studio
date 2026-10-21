@@ -1,5 +1,5 @@
-const CACHE = 'klm-qr-studio-v3';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './qrcodegen.js', './manifest.webmanifest',
+const CACHE = 'klm-qr-studio-v4';
+const ASSETS = ['./', './index.html', './style.css', './app.js', './qrcodegen.js', './manifest.webmanifest', './lihat.html',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-180.png', './icons/favicon-32.png'];
 
 self.addEventListener('install', e => {

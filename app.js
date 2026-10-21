@@ -54,6 +54,7 @@ const IC = {
   geo:'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
   event:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   social:'<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+  img:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
   pay:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>'
 };
 const icon = k => `<svg viewBox="0 0 24 24">${IC[k]}</svg>`;
@@ -69,6 +70,7 @@ const TYPES = {
   url: { label:'Tautan', fields:[{k:'url',l:'Alamat web (URL)',t:'url',ph:'https://contoh.com',d:'https://klm.id'}],
     build:f => { let u = (f.url||'').trim(); if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u; return u; } },
   text: { label:'Teks', fields:[{k:'text',l:'Teks',t:'textarea',ph:'Tulis apa saja…',d:'Halo dari KLM QR Studio!'}], build:f => f.text || '' },
+  image: { label:'Foto', icon:'img', fields:[], build:f => imageData(f) },
   wifi: { label:'WiFi', fields:[
       {k:'ssid',l:'Nama jaringan (SSID)',ph:'WiFi-Rumah'},
       {k:'pass',l:'Kata sandi',t:'password'},
@@ -106,6 +108,72 @@ function fieldsOf(type) {
   t.fields.forEach(x => { if (f[x.k] === undefined && x.d !== undefined) f[x.k] = x.d; });
   return f;
 }
+/* foto di dalam QR: disimpan di #fragment alamat halaman penampil */
+const VIEWER = 'https://klmthebest10.github.io/klm-qr-studio/lihat.html';
+const IMG_BUDGET = { s: 1050, m: 1500, l: 2150 };
+function imageData(f) {
+  if (f.mode === 'link') { let u = String(f.link || '').trim(); if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u; return u || 'https://'; }
+  const base = String(f.viewer || VIEWER).trim();
+  return f.b64 ? `${base}#${f.m || 'w'}${f.b64}${f.cap ? '.' + encodeURIComponent(f.cap) : ''}` : base;
+}
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+let webpOK = null;
+async function compressImage(f) {
+  if (!f.src) { f.b64 = null; return; }
+  const img = await loadImg(f.src);
+  if (webpOK === null) { const c = document.createElement('canvas'); c.width = c.height = 2; webpOK = c.toDataURL('image/webp').startsWith('data:image/webp'); }
+  const extra = String(f.viewer || VIEWER).length + 2 + (f.cap ? encodeURIComponent(f.cap).length + 1 : 0);
+  const budget = Math.max(200, (IMG_BUDGET[f.size] || IMG_BUDGET.m) - extra);
+  const iw = img.naturalWidth, ih = img.naturalHeight; let best = null;
+  for (const side of [224, 192, 168, 148, 132, 120, 108, 96, 88, 80, 72, 64, 56, 48, 40, 32]) {
+    const k = side / Math.max(iw, ih), w = Math.max(8, Math.round(iw * k)), h = Math.max(8, Math.round(ih * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, w, h);
+    if (f.gray) { const d = x.getImageData(0, 0, w, h), a = d.data; for (let i = 0; i < a.length; i += 4) a[i] = a[i + 1] = a[i + 2] = .299 * a[i] + .587 * a[i + 1] + .114 * a[i + 2]; x.putImageData(d, 0, 0); }
+    // coba WebP dan JPEG, ambil yang kualitasnya tertinggi dalam batas
+    let here = null;
+    for (const [mime, m] of webpOK ? [['image/webp', 'w'], ['image/jpeg', 'j']] : [['image/jpeg', 'j']]) {
+      for (const q of [.85, .75, .65, .55, .45, .36, .28, .2, .12]) {
+        const b64 = c.toDataURL(mime, q).split(',')[1].replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        if (b64.length <= budget) { if (!here || q > here.q) here = { b64, w, h, q, m }; break; }
+      }
+    }
+    if (here) { if (!best) best = here; if (here.q >= .36) { best = here; break; } }
+  }
+  if (!best) { f.b64 = null; toast('Foto tidak muat — pilih ukuran yang lebih besar'); return; }
+  Object.assign(f, best);
+}
+function readImageForQR(file) {
+  if (!file || !file.type.startsWith('image/')) return toast('Pilih file gambar');
+  const r = new FileReader();
+  r.onload = async () => {
+    const img = await loadImg(r.result), max = 900, k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+    const f = S.fields.image; f.src = c.toDataURL('image/jpeg', .85); f.mode = 'embed';
+    await compressImage(f); buildForm(); update(); toast('Foto dimasukkan ke QR');
+  };
+  r.readAsDataURL(file);
+}
+function imageForm(f) {
+  const seg = (attr, list, v) => `<div class="seg" ${attr}>${list.map(([a, b]) => `<button type="button" data-v="${a}" class="${a === v ? 'on' : ''}">${b}</button>`).join('')}</div>`;
+  let h = `<div class="field">${seg('data-imgmode', [['embed', 'Simpan di dalam QR'], ['link', 'Tautan foto online']], f.mode)}</div>`;
+  if (f.mode === 'link') {
+    h += `<label class="field"><span>Tautan foto</span><input type="url" data-k="link" value="${esc(f.link || '')}" placeholder="https://drive.google.com/…"></label>
+      <p class="hint full">Unggah foto ke Google Drive, Google Photos, atau situs lain, atur aksesnya ke <b>Siapa saja yang memiliki link</b>, lalu tempel tautannya di sini. Ukuran dan kualitas foto tidak terbatas, tapi butuh internet saat dipindai.</p>`;
+  } else {
+    const kb = f.b64 ? (f.b64.length * 3 / 4 / 1024).toFixed(1) : 0;
+    h += `<div class="drop full" id="qrImgDrop"><input type="file" id="qrImgFile" accept="image/*" hidden>
+        ${f.b64 ? `<img src="data:image/${f.m === 'j' ? 'jpeg' : 'webp'};base64,${f.b64.replace(/-/g, '+').replace(/_/g, '/')}" alt="" class="img-in-qr">` : ''}
+        <div class="drop-txt"><b>${f.src ? 'Ganti foto' : 'Pilih foto'}</b><span>${f.b64 ? `Disimpan ${f.w}×${f.h} px · ${kb} KB` : 'Klik, seret ke sini, atau tempel (Ctrl+V)'}</span></div></div>
+      <div class="field"><span>Ukuran foto di dalam QR</span>${seg('data-imgsize', [['s', 'Kecil · mudah dipindai'], ['m', 'Sedang'], ['l', 'Besar · lebih jelas']], f.size)}</div>
+      <label class="switch"><input type="checkbox" data-imgk="gray" ${f.gray ? 'checked' : ''}><i></i><span>Hitam putih (foto bisa lebih tajam)</span></label>
+      <label class="field"><span>Keterangan (opsional)</span><input data-k="cap" data-recompress value="${esc(f.cap || '')}" maxlength="80" placeholder="mis. Kenangan 2026"></label>
+      <details class="raw full"><summary>Alamat halaman penampil</summary><input data-k="viewer" data-recompress value="${esc(f.viewer || VIEWER)}" style="margin-top:8px"></details>
+      <p class="hint full">Foto dikecilkan dan disimpan langsung di dalam QR — tidak diunggah ke mana pun. Saat dipindai, HP membuka halaman penampil yang memunculkan foto ini. Muatnya kecil (seukuran thumbnail), jadi pakai foto dengan objek jelas seperti wajah atau logo.</p>`;
+  }
+  return h;
+}
 const dataOf = (st = S) => { const t = TYPES[st.type] || TYPES.text; return t.build(st.fields[st.type] || {}); };
 
 /* ---------------- QR ENCODE ---------------- */
@@ -116,12 +184,17 @@ function encode(text, st = S) {
   if (st.logo.src && (st.ecl === 'L' || st.ecl === 'M')) ecl = lv.Q;
   const hasPh = !!(st.photo && st.photo.proc);
   if (hasPh) ecl = lv.H;
+  if (st.type === 'image' && st.fields.image && st.fields.image.mode !== 'link' && (ecl === lv.Q || ecl === lv.H) && !st.logo.src && !hasPh) ecl = lv.M; // QR foto: utamakan modul besar
   const segs = qrcodegen.QrSegment.makeSegments(text || ' ');
   // logo menutup sebagian modul: versi kecil terlalu rapuh, jadi naikkan versi minimum
   let minV = +st.minVer || 1;
   if (st.logo.src) minV = Math.max(minV, st.logo.size > 30 && st.logo.margin > .5 ? 7 : 5);
   if (hasPh) minV = Math.max(minV, +st.photo.minVer || 1);
-  return qrcodegen.QrCode.encodeSegments(segs, ecl, minV, 40, +st.mask, st.boost || !!st.logo.src);
+  const order = [lv.H, lv.Q, lv.M, lv.L];
+  for (let i = order.indexOf(ecl); i < order.length; i++) {
+    try { return qrcodegen.QrCode.encodeSegments(segs, order[i], minV, 40, +st.mask, st.boost || !!st.logo.src); }
+    catch (e) { if (i === order.length - 1) throw e; } // data terlalu panjang: turunkan ECC agar tetap muat
+  }
 }
 
 /* ---------------- SHAPES ---------------- */
@@ -412,12 +485,13 @@ function syncChips() {
   $$('#frameGrid .chip').forEach(b => b.classList.toggle('on', b.dataset.v === S.frame.style));
 }
 function buildTypeGrid() {
-  $('#typeGrid').innerHTML = Object.entries(TYPES).map(([k, t]) => `<button data-t="${k}">${icon(k)}${t.label}</button>`).join('');
+  $('#typeGrid').innerHTML = Object.entries(TYPES).map(([k, t]) => `<button data-t="${k}">${icon(t.icon || k)}${t.label}</button>`).join('');
   $('#typeGrid').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.type = b.dataset.t; buildForm(); update(); };
 }
 function buildForm() {
   $$('#typeGrid button').forEach(b => b.classList.toggle('on', b.dataset.t === S.type));
   const f = fieldsOf(S.type);
+  if (S.type === 'image') { Object.keys({ mode: 'embed', size: 'm', gray: false }).forEach(k => { if (f[k] === undefined) f[k] = { mode: 'embed', size: 'm', gray: false }[k]; }); $('#typeForm').innerHTML = imageForm(f) + '<div class="counter" id="counter"></div>'; return; }
   $('#typeForm').innerHTML = TYPES[S.type].fields.map(x => {
     const v = f[x.k] ?? '';
     if (x.t === 'switch') return `<label class="switch"><input type="checkbox" data-k="${x.k}" ${v ? 'checked' : ''}><i></i><span>${x.l}</span></label>`;
@@ -431,9 +505,20 @@ function buildForm() {
 }
 $('#typeForm').addEventListener('input', e => {
   const k = e.target.dataset.k; if (!k) return;
-  S.fields[S.type][k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; update();
+  S.fields[S.type][k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  if (e.target.hasAttribute('data-recompress')) { clearTimeout(recompT); recompT = setTimeout(async () => { await compressImage(S.fields.image); update(); }, 250); }
+  update();
 });
-$('#typeForm').addEventListener('click', e => {
+let recompT;
+$('#typeForm').addEventListener('change', async e => {
+  if (e.target.id === 'qrImgFile') { readImageForQR(e.target.files[0]); e.target.value = ''; }
+  if (e.target.dataset.imgk) { S.fields.image[e.target.dataset.imgk] = e.target.checked; await compressImage(S.fields.image); buildForm(); update(); }
+});
+['dragover','drop'].forEach(ev => $('#typeForm').addEventListener(ev, e => { const d = e.target.closest('#qrImgDrop'); if (!d) return; e.preventDefault(); if (ev === 'drop') readImageForQR(e.dataTransfer.files[0]); }));
+$('#typeForm').addEventListener('click', async e => {
+  if (e.target.closest('#qrImgDrop')) return $('#qrImgFile').click();
+  const sb = e.target.closest('[data-imgmode] button, [data-imgsize] button');
+  if (sb) { const f = S.fields.image; if (sb.parentNode.hasAttribute('data-imgmode')) f.mode = sb.dataset.v; else { f.size = sb.dataset.v; await compressImage(f); } buildForm(); update(); return; }
   if (e.target.closest('#myLoc')) {
     if (!navigator.geolocation) return toast('Lokasi tidak didukung');
     navigator.geolocation.getCurrentPosition(p => { const f = S.fields.geo; f.lat = p.coords.latitude.toFixed(6); f.lng = p.coords.longitude.toFixed(6); buildForm(); update(); }, () => toast('Izin lokasi ditolak'));
@@ -569,7 +654,7 @@ $('#logoFile').onchange = e => readLogo(e.target.files[0]);
 ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => readLogo(e.dataTransfer.files[0]));
-document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (!f) return; if ($('[data-panel="logo"]').classList.contains('on')) readLogo(f); else if ($('[data-panel="foto"]').classList.contains('on')) readPhoto(f); });
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (!f) return; if ($('[data-panel="isi"]').classList.contains('on') && S.type === 'image') readImageForQR(f); else if ($('[data-panel="logo"]').classList.contains('on')) readLogo(f); else if ($('[data-panel="foto"]').classList.contains('on')) readPhoto(f); });
 $('#logoClear').onclick = () => setLogo(null);
 
 // foto
@@ -670,6 +755,10 @@ function update(skipRender) {
   const cr = Math.min(contrast(dc, bc), contrast(dc2, bc));
   if (cr < 3) w.push('Kontras warna titik dan latar rendah — QR bisa sulit dipindai.');
   if (lum(dc) > lum(bc) + .2) w.push('Titik lebih terang dari latar (warna terbalik). Sebagian pemindai tidak bisa membacanya.');
+  const wantEcl = S.photo.proc ? 'H' : S.logo.src && 'LM'.includes(S.ecl) ? 'Q' : S.type === 'image' && S.fields.image?.mode !== 'link' && 'QH'.includes(S.ecl) ? 'M' : S.ecl;
+  if ('LMQH'.indexOf(eclName) < 'LMQH'.indexOf(wantEcl)) w.push(`Data panjang — koreksi kesalahan diturunkan ke ${eclName} supaya muat.` + (S.logo.src || S.photo.proc ? ' Hapus logo/foto QR agar tetap terbaca.' : ''));
+  if (r.qr.version > 24) w.push(`QR sangat padat (versi ${r.qr.version}) — pakai bentuk titik Kotak, tanpa logo/foto, unduh ukuran besar, dan cetak minimal 7 cm.`);
+  if (S.type === 'image' && S.fields.image?.mode !== 'link' && !S.fields.image?.b64) w.push('Pilih foto dulu untuk dimasukkan ke QR.');
   if (S.photo.proc && S.photo.mode === 'fill' && S.photo.avg > .45) w.push('Foto terlalu terang untuk mengisi titik — turunkan kecerahan atau naikkan kontras di tab Foto.');
   if (S.photo.proc && S.photo.mode === 'halftone' && S.photo.dot < .38) w.push('Titik pusat kecil — QR foto perlu dicetak cukup besar (min. ±3 cm) agar mudah dipindai.');
   if (S.photo.proc && S.photo.minVer > 8 && +S.exportSize < 800) w.push('QR foto rapat — unduh dengan ukuran besar dan cetak minimal ±4 cm.');
