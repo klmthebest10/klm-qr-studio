@@ -1,0 +1,66 @@
+name: Rilis exe & apk
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rilis
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kumpulkan berkas aplikasi web
+        run: |
+          mkdir -p /tmp/web
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'android' --exclude 'launcher' --exclude 'windows' --exclude 'unduh' --exclude 'README.md' ./ /tmp/web/
+          ls /tmp/web | head -50
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Bangun exe Windows
+        run: |
+          cd windows && sh build.sh && mv "KLM QR Studio.exe" ../KLM-QR-Studio.exe
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Terima lisensi Android SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || yes | sdkmanager --licenses > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Bangun APK Android
+        run: |
+          mkdir -p android/app/src/main/assets
+          rm -rf android/app/src/main/assets/web && cp -r /tmp/web android/app/src/main/assets/web
+          rm -f android/app/src/main/assets/web/sw.js
+          cd android && gradle --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "../KLM-QR-Studio.apk"
+
+      - name: Rilis
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: KLM QR Studio v1.0.${{ github.run_number }}
+          make_latest: true
+          body: |
+            **Windows:** unduh `KLM-QR-Studio.exe`, klik dua kali untuk membuka (bila muncul SmartScreen: *Info selengkapnya → Tetap jalankan*).
+            **Android:** unduh `KLM-QR-Studio.apk`, buka di HP, izinkan *Pasang dari sumber tidak dikenal*, lalu pasang.
+          files: |
+            KLM-QR-Studio.exe
+            KLM-QR-Studio.apk

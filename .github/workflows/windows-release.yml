@@ -1,9 +1,7 @@
 name: Bangun versi Windows
 
 on:
-  push:
-    tags: ['v*']
-  workflow_dispatch:
+  workflow_dispatch:   # rilis otomatis kini lewat rilis.yml (exe + apk)
 
 permissions:
   contents: write
